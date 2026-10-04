@@ -1,6 +1,6 @@
 # ReadMe 
 
-Participants: 
+Participants: Constantin Schmidt-Chiari, Tobias Rungg, Melody Cohen, Kristina Mihaylova, Elliot Jonsson, Augustin Lemarquand, Bob Hunold, Tim Hirndorf
 
 Task:
 
