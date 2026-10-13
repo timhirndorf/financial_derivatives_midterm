@@ -1,0 +1,385 @@
+MIDTERM PRESENTATION - SLIDE PLAN v2  (12-MINUTE VERSION)
+FIN 6999 Financial Derivatives (Prof. R. Rebonato)
+European call: S0 = 100, K = 100, T = 1y, sigma = 20%, r = 3.94%, GBM, no dividends
+
+v1 (presentation_slide_plan.txt) is kept as the long version. Use it as the
+source for backup material and Q&A.
+
+=====================================================================
+PART A - HOW THE PROFESSOR'S LECTURES ARE BUILT (and how we copy it)
+=====================================================================
+Observed in Options, Replication_One_Period, Continuous, Hedging, Numerical,
+Elements Stochastic Calculus:
+
+1. Fixed frame. Each lecture has the same three opening slides:
+     (1) title + "Riccardo Rebonato",
+     (2) "Outline" (the list of sections),
+     (3) "Plan of the Lecture" (4-6 bullets starting with verbs: "Show...",
+         "Explain...", "Invoke no-arbitrage to...", "Show what the result
+         does not depend on").
+   -> We do the same: Title, Outline, "Plan of the Presentation".
+
+2. The slide title is the SECTION name, repeated on every slide of the section
+   ("Hedging", "Hedging", ... / "Two Steps", "Two Steps", ...). There are no
+   catchy per-slide headlines.
+   -> Our section titles are Pricing / Replication / Greeks / Conclusions.
+
+3. Plain LaTeX Beamer, default theme, white background, triangle bullets
+   (the ▶ marker), numbered equations (1), (2), ... Figures are captioned
+   "Figure: ...". No colour, no icons, no logos.
+   -> Build the deck in Beamer (or a plain PowerPoint copying that look) and
+      number the equations so we can say "from equation (4)...".
+
+4. Text is prose: full sentences, 40-90 words per slide, one idea per slide.
+   Short sentences, first person ("I want to build a portfolio...",
+   "Let's see:").
+
+5. Proofs are written as "Proof:" followed by numbered steps (1., 2., 3.) and
+   end with the conclusion. They are mostly no-arbitrage or Ito/Taylor
+   arguments, never heavy measure theory. When he skips something he says so
+   ("one can show - we won't - that...").
+
+6. Intuition first, maths second, then a remark on what the result DOES NOT
+   depend on (the real-world drift mu disappears; investors' risk preferences
+   do not matter). This is his favourite point.
+
+7. He asks the room questions, then answers on the next line or slide
+   ("Can you think of two examples...?" / "Answer: ...", "What must mu be?",
+   "How can this work?").
+
+8. He links back to earlier results ("Remember how we derived...",
+   "Remember the Ito isometry").
+
+9. He uses informal asides and a bit of humour ("mercifully and magically
+   cancel out", "Mr Ito would not be happy", "just nod encouragingly").
+
+10. He frames things by how practitioners think: hedging is about delivered
+    variance; volatility is the "BIG problem".
+
+Design consequence for 12 minutes: the frame slides take almost no time, the
+"Plan" slide does the roadmap, and each section gets 2-3 content slides. We
+include only proofs that he would recognise (Ito / Taylor / no-arbitrage /
+CLT). Everything else goes to the backup slides.
+
+=====================================================================
+PART B - TIMING (12:00 total)
+=====================================================================
+  #   Slide title (= section)        Content                         Time
+  1   Title                          -                               0:15
+  2   Outline                        auto-generated section list     0:10
+  3   Plan of the Presentation       what we show                    0:25
+  4   Pricing                        one price, four engines         0:50
+  5   Pricing                        results table                   0:40
+  6   Pricing                        convergence (3 rates)           1:30
+  7   Pricing                        uncertainty + room question     0:50
+  8   Replication                    set-up + results                1:10
+  9   Replication                    proof: gamma vs. theta P&L      1:45
+  10  Replication                    what it depends on / when fails 1:15
+  11  Greeks                         results + delta question        1:00
+  12  Greeks                         how each method gets them       0:55
+  13  Conclusions                    5 takeaways                     0:40
+                                                         TOTAL     11:30
+  30 seconds of buffer. Backup slides B1-B5 are only for Q&A.
+
+Speakers: with 8 people, 12 minutes means about 90 seconds each and 7
+hand-overs. Better: 4 speakers presenting (3 min each), with the other 4
+covering Q&A per section. If everyone must speak, see the split at the end.
+
+=====================================================================
+PART C - THE SLIDES
+=====================================================================
+Format per slide:
+  TEXT     - what is written on the slide, in his prose style
+  VISUAL   - figure/table (from midterm.ipynb)
+  PROOF    - what we show on the slide
+  BEHIND   - what underlies the result (speaker knows it, not on the slide)
+  SAY      - the spoken key point
+
+---------------------------------------------------------------------
+SLIDE 1 - Title
+---------------------------------------------------------------------
+TEXT     "Pricing, Replicating and Hedging a European Call"
+         Mid-term project - FIN 6999 Financial Derivatives
+         All 8 names. Use the README list: the notebook header is missing
+         Tim Hirndorf and Kristina Mihaylova, and misspells Augustin.
+
+---------------------------------------------------------------------
+SLIDE 2 - Outline
+---------------------------------------------------------------------
+TEXT     Outline
+           Plan of the Presentation
+           Pricing
+           Replication
+           Greeks
+           Conclusions
+SAY      nothing. Click through.
+
+---------------------------------------------------------------------
+SLIDE 3 - Plan of the Presentation
+---------------------------------------------------------------------
+TEXT
+  ▶ We value a 1-year at-the-money call (S0 = K = 100, sigma = 20%,
+    r = 3.94%, the 1-month T-bill rate) on a non-dividend-paying stock that
+    follows a GBM.
+  ▶ In this presentation we
+    1. price the option with Black-Scholes, Monte Carlo, a binomial tree and
+       a Crank-Nicolson grid, and study convergence and uncertainty;
+    2. replicate the option by delta hedging along Monte Carlo paths, and
+       explain the hedging error;
+    3. estimate delta, gamma and vega with all methods.
+  ▶ We show what the results depend on, and what they do not depend on.
+SAY      "One option, three questions. Black-Scholes is the benchmark for
+          everything."
+
+---------------------------------------------------------------------
+SLIDE 4 - Pricing  (one price, four engines)
+---------------------------------------------------------------------
+TEXT
+  Remember that, given dS_t = mu S_t dt + sigma S_t dz_t, no-arbitrage gives
+  the PDE
+     dC/dt + r S dC/dS + 1/2 sigma^2 S^2 d2C/dS2 - r C = 0             (1)
+  and, by Feynman-Kac, its solution is the discounted expectation
+     C = e^{-rT} E^Q[ max(S_T - K, 0) ],
+     S_T = S0 exp[(r - 1/2 sigma^2) T + sigma sqrt(T) eps]            (2)
+  ▶ Black-Scholes solves (1) in closed form:
+     C = S0 N(h1) - K e^{-rT} N(h2), h1 = 0.297, h2 = 0.097
+  ▶ Finite differences solve (1) on a grid.
+  ▶ Monte Carlo and the tree compute (2), by sampling and by enumerating.
+VISUAL   none (or a small 2-arrow sketch: Expectation <-> PDE)
+PROOF    none on the slide. We "remember" the derivation from the lecture
+         ("Black and Scholes in Continuous Time").
+BEHIND   Ito on C, Delta = dC/dS kills dz, the riskless portfolio earns r,
+         mu drops out (v1 slide 3). Exact lognormal sampling means MC has no
+         time-discretisation bias.
+SAY      "All four methods compute the same number, so they must agree. What
+          differs is speed and the type of error."
+
+---------------------------------------------------------------------
+SLIDE 5 - Pricing  (results)
+---------------------------------------------------------------------
+TEXT
+  Method                Settings         Call     Error vs BS
+  Black-Scholes         closed form      9.8940   -
+  Monte Carlo           10^8 paths       9.8959   +0.0020  (SE 0.0014)
+  Binomial tree (CRR)   10,000 steps     9.8938   -0.0002
+  Crank-Nicolson        400 x 400        9.8915   -0.0025
+  ▶ Black-Scholes lies inside the MC 95% confidence interval
+    [9.8931, 9.8988].
+  ▶ Tree and grid have the same error for the call and the put, so they
+    respect call-put parity exactly (C - P = S0 - K e^{-rT} = 3.863).
+PROOF    (spoken, one line) Both schemes are linear in the payoff and price
+         the forward exactly, so call minus put has no error. This is the
+         no-arbitrage argument from the "Options" lecture.
+SAY      "Every engine lands within a quarter of a cent."
+
+---------------------------------------------------------------------
+SLIDE 6 - Pricing  (convergence)
+---------------------------------------------------------------------
+TEXT
+  ▶ Monte Carlo: error ~ 1/sqrt(M). Variance of a mean of M i.i.d. payoffs
+    = s^2/M (CLT).
+  ▶ Tree: error ~ 1/N. The binomial distribution of log S_T tends to a
+    Gaussian. The error zig-zags because the kink at K falls on or between
+    nodes (odd/even N).
+  ▶ Crank-Nicolson: error ~ 1/N^2. Central differences in S and in t
+    (Taylor: the odd terms cancel).
+  10x more effort gives 3.2x / 10x / 100x smaller error.
+VISUAL   three log-log error plots side by side (notebook: MC SE, tree error,
+         FD error) with slopes -1/2, -1, -2.
+         Caption: "Figure: Pricing error vs. effort (log-log)."
+PROOF    on the slide: just the three one-line reasons above.
+         Optional line: error = c N^{-k} => log error = log c - k log N,
+         a straight line with slope -k.
+BEHIND   Full arguments in backup B3 (Taylor), B4 (MC SE) and v1 slide 7
+         (CRR, CLT). Numbers: MC SE 1.0 / 0.014 / 0.0014 at M = 10^2 / 10^6
+         / 10^8; tree error 1.8 / 0.02 / 0.002 / 0.0002 at N = 1 / 10^2 /
+         10^3 / 10^4; FD error divides by 4 with every doubling.
+SAY      "Same answer, very different speed. The slope of the line is the
+          order of convergence."
+
+---------------------------------------------------------------------
+SLIDE 7 - Pricing  (uncertainty)
+---------------------------------------------------------------------
+TEXT
+  ▶ Monte Carlo error is statistical: random and unbiased. We report a
+    confidence interval, C_hat +/- 1.96 SE.
+  ▶ Tree and grid errors are discretisation errors: deterministic, a bias
+    with no confidence interval, and known from the convergence order.
+  ▶ Which error is the largest?
+  ▶ Answer: none of the above. A 1 vol-point error in sigma moves the price
+    by vega x 0.01 = 0.38, about 200 times the MC standard error.
+PROOF    Error = bias + noise. MC: bias 0, noise s/sqrt(M). Tree/FD: bias
+         c N^{-k}, noise 0. Model error ~ Vega x (sigma_true - sigma_used).
+SAY      "Our numerical errors are tiny. The real uncertainty is the
+          volatility we put in." (This sets up Replication.)
+
+---------------------------------------------------------------------
+SLIDE 8 - Replication  (set-up and results)
+---------------------------------------------------------------------
+TEXT
+  ▶ Sell the call for C0 = 9.894, buy Delta = N(h1) shares, put the rest in
+    the bank. Rebalance on a fixed grid, self-financing. Paths are simulated
+    with the real-world drift mu.
+  ▶ Record eps = Pi_T - max(S_T - K, 0) on each of 10,000 paths.
+  Rebalancing dates   4      12     52     252    1000
+  Std of eps          3.22   1.94   0.95   0.44   0.22
+  Mean of eps         0.06   0.01   0.01   0.01   0.00
+VISUAL   histogram of eps with daily rebalancing (mean 0.002, std 0.44),
+         plus the log-log plot of std vs. N (slope -1/2)
+SAY      "On average the hedge works. Path by path it misses, and 4 times
+          more trading only halves the miss. Why?"
+
+---------------------------------------------------------------------
+SLIDE 9 - Replication  (the proof: gamma vs. theta)
+---------------------------------------------------------------------
+TEXT
+  Proof: P&L of the hedged position over one step dt
+  1. Taylor/Ito: dC = Theta dt + Delta dS + 1/2 Gamma dS^2
+  2. The replicating portfolio earns Delta dS + r (C - Delta S) dt
+  3. The PDE (1) gives -Theta + r (C - Delta S) = 1/2 sigma^2 S^2 Gamma
+  4. Therefore
+       d eps = 1/2 Gamma S^2 [ sigma^2 dt - (dS/S)^2 ]                (3)
+     "variance we were paid for" minus "variance that was delivered"
+  ▶ E[(dS/S)^2] = sigma^2 dt, so the mean error is 0.
+  ▶ Each step adds noise of order dt; summed over N steps, std ~ 1/sqrt(N).
+  ▶ mu does not appear in (3): the result does not depend on the drift.
+VISUAL   optional: the "break-even movements" picture style from Hedging.pdf
+         (option parabola above the delta line)
+BEHIND
+  - As dt -> 0, (dS)^2 -> sigma^2 S^2 dt exactly (Ito isometry: "there are
+    no lucky paths"), so eps -> 0. This is the Black-Scholes argument itself,
+    and "Gamma = -Theta" from the Hedging lecture.
+  - Check against a known formula (Derman-Kamal 1999):
+    std(eps) ~ sqrt(pi/4) sigma Vega / sqrt(N) = 6.77/sqrt(N)
+    gives 3.38 / 1.95 / 0.94 / 0.43 / 0.21 vs. our 3.22 / 1.94 / 0.95 /
+    0.44 / 0.22. Backup B1.
+SAY      "This is the key slide. After delta hedging, what is left is a bet
+          on volatility: gamma times implied minus realised variance."
+
+---------------------------------------------------------------------
+SLIDE 10 - Replication  (what it depends on, when it fails)
+---------------------------------------------------------------------
+TEXT
+  Equation (3) tells us everything:
+  ▶ Rebalancing frequency: std ~ 1/sqrt(N). Quarterly gives 3.2, about a
+    third of the premium.
+  ▶ Where the path goes: Gamma S^2 is largest near K close to expiry, so
+    paths ending near the strike have the biggest errors.
+  ▶ The volatility that was delivered:
+      True vol     10%     15%     20%    25%     30%
+      Mean eps     +3.90   +1.97   0.01   -1.98   -3.97
+    Check: Vega x 5 vol points = 38.17 x 0.05 = 1.91.
+  ▶ Not the drift: mean about 0 for mu = 0%, 5%, 10%, 20%.
+  Works well with frequent trading, the right sigma and no jumps. Fails with
+  rare trading, wrong sigma, S near K near expiry, transaction costs, jumps.
+VISUAL   scatter "eps vs. S_T" (funnel at K) or the wrong-vol histograms.
+         Pick ONE.
+PROOF    Taking expectations in (3) with sigma_real != sigma:
+         E[eps] = 1/2 * integral of E[Gamma S^2] (sigma^2 - sigma_real^2) dt,
+         which is about Vega x (sigma - sigma_real).
+SAY      "Wrong volatility turns noise into a systematic loss. In the
+          lecture's words: the variance delivered is the BIG problem."
+
+---------------------------------------------------------------------
+SLIDE 11 - Greeks  (results)
+---------------------------------------------------------------------
+TEXT
+            BS        MC (10^6, SE)       Tree (N = 1000)
+  Delta     0.6168    0.6167 (0.0006)     0.6167
+  Gamma     0.01909   0.01903 (0.00011)   0.01910
+  Vega      38.17     38.19 (0.08)        38.16
+  ▶ The option is at the money. Why is delta 0.62 and not 0.5?
+  ▶ Answer: h1 = (r + 1/2 sigma^2) sqrt(T) / sigma = 0.297 > 0. The forward
+    S0 e^{rT} = 104 > K, and the lognormal is right-skewed. Delta is a hedge
+    ratio, not the probability of exercise (N(h2) = 0.54).
+PROOF    closed forms Delta = N(h1), Gamma = phi(h1)/(S sigma sqrt T),
+         Vega = S phi(h1) sqrt T. The "magic cancellation" is
+         S phi(h1) = K e^{-rT} phi(h2) (backup B2).
+SAY      "All three methods agree to 3-4 digits."
+
+---------------------------------------------------------------------
+SLIDE 12 - Greeks  (how each method gets them)
+---------------------------------------------------------------------
+TEXT
+  ▶ Tree: delta and gamma come for free from the first nodes
+    (Delta = (C_u - C_d)/(Su - Sd), as in one-period replication). Vega
+    needs two extra trees. Error ~ 1/N.
+  ▶ Monte Carlo: bump and reprice with the same random numbers,
+      Delta ~ [C(S+h) - C(S-h)]/(2h),
+      Gamma ~ [C(S+h) - 2C(S) + C(S-h)]/h^2
+    Bias ~ h^2, but the variance of gamma ~ 1/h: only paths ending near K
+    contribute. That is a bias-variance trade-off, and we use h = 1.
+VISUAL   "MC gamma vs. bump size h" (notebook)
+BEHIND   Common random numbers: Var(X - Y) = Var X + Var Y - 2 Cov(X,Y).
+         Pathwise and likelihood-ratio estimators exist (mention if asked).
+SAY      "The tree gets Greeks almost for free. Monte Carlo has to difference
+          noisy numbers, and gamma suffers most."
+
+---------------------------------------------------------------------
+SLIDE 13 - Conclusions
+---------------------------------------------------------------------
+TEXT
+  ▶ All engines converge to 9.894: MC at order 1/2, the tree at order 1,
+    Crank-Nicolson at order 2.
+  ▶ The numerical error is small compared with the error from the volatility
+    input (vega).
+  ▶ The delta-hedging error is 1/2 Gamma S^2 (implied - realised variance).
+    With the right sigma it is zero on average and shrinks like 1/sqrt(N).
+    With the wrong sigma it is a systematic P&L of about Vega x the vol error.
+  ▶ The result does not depend on the drift mu.
+  ▶ Gamma and vega peak near the strike, and that is where hedging is
+    hardest.
+SAY      end with: "Questions?"
+
+=====================================================================
+PART D - BACKUP SLIDES (after Conclusions, only for Q&A)
+=====================================================================
+B1 Replication - discrete-hedging error vs. Derman-Kamal
+   Table: simulated std vs. 6.77/sqrt(N) for N = 4, 12, 52, 252, 1000.
+B2 Greeks - Delta = N(h1)
+   Proof: phi(h2)/phi(h1) = exp((h1^2 - h2^2)/2) = S e^{rT}/K,
+   so S phi(h1) = K e^{-rT} phi(h2), so the extra terms cancel.
+B3 Pricing - finite-difference truncation error
+   Taylor: V(S +/- h); subtract to get V' + O(h^2), add to get V'' + O(h^2).
+   CN is centred in time, so O(dt^2). CN is unconditionally stable; the
+   explicit scheme in the lecture is not ("can be unstable").
+B4 Pricing - MC standard error and CI
+   Var(mean) = s^2/M, CLT, 95% CI. s is about 14.
+B5 Pricing - CRR tree
+   u = e^{sigma sqrt dt}, d = 1/u, p = (e^{r dt} - d)/(u - d).
+   Matches mean and variance (as in "A Twist in the Tale"). The odd/even
+   oscillation comes from the strike sitting on or between nodes.
+
+=====================================================================
+PART E - SPEAKER SPLIT
+=====================================================================
+Option 1 (recommended): 4 speakers
+  S1: slides 1-5   (frame + Pricing set-up and results)        ~2:20
+  S2: slides 6-7   (convergence, uncertainty)                  ~2:20
+  S3: slides 8-10  (Replication)                               ~4:10
+  S4: slides 11-13 (Greeks, Conclusions)                       ~2:35
+  The other four take Q&A for each section (Pricing, Replication,
+  Greeks, numerical details).
+
+Option 2: all 8 speak (~85 s each)
+  1: slides 1-4  2: slide 5-6 (first half)  3: slides 6 (second half)-7
+  4: slide 8     5: slide 9     6: slide 10     7: slide 11
+  8: slides 12-13
+
+=====================================================================
+PART F - WHAT WAS CUT FROM v1 (and where it went)
+=====================================================================
+  - Separate BS, MC, tree and FD method slides  -> merged into slides 4-6;
+    details in B3-B5
+  - Full PDE derivation                         -> "Remember..." on slide 4
+  - Separate "dependencies", "wrong vol" and "works / fails" slides
+                                                -> merged into slide 10
+  - Delta interpretation slide                  -> question/answer on slide 11
+  - Theta consistency check, transaction-cost trade-off, pathwise
+    estimators                                  -> verbal Q&A only (v1 file)
+
+Before building:
+  - Export the missing notebook plots as PNGs (hedging histogram, hedging
+    std vs. N, eps vs. S_T, MC gamma vs. h, Greeks error plots).
+  - Use h1/h2 notation throughout, like the professor.
+  - Rehearse with a timer. Slide 9 is the only one that may run long.

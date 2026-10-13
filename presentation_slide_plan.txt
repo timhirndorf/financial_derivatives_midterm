@@ -1,0 +1,587 @@
+MIDTERM PRESENTATION - SLIDE PLAN
+FIN 6999 Financial Derivatives (Prof. R. Rebonato)
+European call: S0 = 100, K = 100, T = 1y, sigma = 20%, r = 3.94%, GBM, no dividends
+
+Sources: MIDTERM.pdf (task), midterm/results.md, midterm/midterm.ipynb (plots),
+lectures Continuous.pdf, Hedging.pdf, Numerical.pdf, Replication_One_Period.pdf.
+
+HOW TO READ THIS FILE
+For every slide:
+  ON THE SLIDE   - what the audience sees (text, numbers, tables)
+  VISUAL         - which plot/table from the notebook to use
+  PROOF TO SHOW  - the maths we actually put on the slide and walk through
+  UNDERLYING     - the maths behind the result. Keep it off the slide (or in the
+                   appendix) but know it for questions
+  SAY            - the key sentence the speaker should get across
+
+Notation: we follow the lecture notation where it helps (h1, h2 = d1, d2;
+dz_t = Brownian increment; Theta, Gamma). Pick ONE (d1/d2 or h1/h2) and use it
+on every slide.
+
+Suggested length: 20 main slides + 4 appendix slides, about 20-25 minutes.
+With 8 people: 2-3 slides each (split suggestion at the end).
+
+=====================================================================
+SECTION 0 - INTRO
+=====================================================================
+
+---------------------------------------------------------------------
+SLIDE 1 - Title
+---------------------------------------------------------------------
+ON THE SLIDE
+  "Pricing, Replicating and Hedging a European Call:
+   Black-Scholes vs. Monte Carlo vs. Trees vs. Finite Differences"
+  Course, date, all 8 team members.
+  NOTE: the notebook header lists only 6 names (Tim Hirndorf and Kristina
+  Mihaylova are missing, and "Augstin" is misspelled). The README has all 8.
+  Use the README list.
+VISUAL   none / a GBM path fan as background
+PROOF    none
+
+---------------------------------------------------------------------
+SLIDE 2 - The problem and our roadmap
+---------------------------------------------------------------------
+ON THE SLIDE
+  Contract and parameters (one small box):
+    S0 = 100, K = 100 (ATM), T = 1, sigma = 20%, r = 3.94% (1-month T-bill),
+    payoff max(S_T - K, 0)
+  Model: dS_t = mu S_t dt + sigma S_t dz_t (GBM)
+  Three questions = three parts:
+    1. What is it worth?  (BS, MC, tree, FD grid; convergence and uncertainty)
+    2. Can we replicate it? (MC delta-hedging, hedging error)
+    3. How sensitive is it? (Delta, Gamma, Vega with all methods)
+  Mention our choice of r and why (the task does not give a rate).
+VISUAL   a 3-box roadmap graphic
+PROOF    none
+SAY      "One option, three questions, four methods. Everything is benchmarked
+          against the Black-Scholes closed form."
+
+---------------------------------------------------------------------
+SLIDE 3 - The one idea behind every method (theory foundation)
+---------------------------------------------------------------------
+ON THE SLIDE
+  Price = discounted risk-neutral expectation = solution of the BS PDE
+     C = e^{-rT} E^Q[ max(S_T - K, 0) ]
+     S_T = S0 exp( (r - sigma^2/2) T + sigma sqrt(T) Z ),  Z ~ N(0,1)
+     dC/dt + r S dC/dS + 1/2 sigma^2 S^2 d2C/dS2 - r C = 0,  C(S,T) = (S-K)^+
+  Map: MC = samples the expectation, tree = enumerates it on a lattice,
+       FD grid = solves the PDE, BS = solves it in closed form.
+VISUAL   diagram: "Expectation (MC, Tree)" <-- Feynman-Kac --> "PDE (FD, BS)"
+PROOF TO SHOW (short derivation of the PDE, as in Continuous.pdf):
+  1. Ito on C(S,t):
+     dC = (C_t + mu S C_S + 1/2 sigma^2 S^2 C_SS) dt + sigma S C_S dz
+  2. Portfolio Pi = C - Delta S. Choose Delta = C_S so the dz term drops out.
+  3. Riskless => dPi = r Pi dt (no arbitrage)
+     => C_t + r S C_S + 1/2 sigma^2 S^2 C_SS - r C = 0
+  4. mu has disappeared, so we can price as if mu = r (risk-neutral pricing).
+UNDERLYING
+  - Feynman-Kac: the solution of this parabolic PDE equals the conditional
+    expectation of the discounted payoff under the measure where S drifts at r.
+  - Ito's lemma for ln S: d ln S = (mu - sigma^2/2) dt + sigma dz, so S_T is
+    lognormal. This gives the exact simulation formula used in MC (no time
+    discretisation error).
+SAY      "All four methods compute the same number in different ways, so they
+          have to agree. The question is how fast and how precisely."
+
+=====================================================================
+SECTION 1 - OPTION VALUE
+=====================================================================
+
+---------------------------------------------------------------------
+SLIDE 4 - Black-Scholes benchmark
+---------------------------------------------------------------------
+ON THE SLIDE
+  C = S0 N(d1) - K e^{-rT} N(d2)
+  d1 = [ln(S0/K) + (r + sigma^2/2)T] / (sigma sqrt T) = 0.297
+  d2 = d1 - sigma sqrt T = 0.097
+  C_BS = 9.8940   P_BS = 6.0306
+  Put-call parity check: C - P = S0 - K e^{-rT} = 3.863
+VISUAL   small number box
+PROOF TO SHOW
+  Since ln(S0/K) = 0, d1 = (r + sigma^2/2) sqrt(T) / sigma = (0.0394 + 0.02)/0.2 = 0.297.
+  Put-call parity from a static replication argument: call - put = forward,
+  so both sides pay S_T - K in every state, so by no arbitrage they cost the
+  same today.
+UNDERLYING
+  - Derivation of BS from the expectation (Appendix A1):
+    E^Q[(S_T-K)^+] = S0 e^{rT} N(d1) - K N(d2), using the lognormal
+    distribution and a change of numeraire (stock measure) for the first term.
+  - N(d2) = Q(S_T > K) = risk-neutral probability of exercise.
+SAY      "This is our exact benchmark. Every numerical error on the next
+          slides is measured against 9.8940."
+
+---------------------------------------------------------------------
+SLIDE 5 - Results: all four prices
+---------------------------------------------------------------------
+ON THE SLIDE (table from results.md)
+  Method               Settings          Price    Error vs BS   Uncertainty
+  Black-Scholes        closed form       9.8940   -             exact
+  Monte Carlo          M = 10^8 paths    9.8959   +0.0020       SE 0.0014, 95% CI [9.8931, 9.8988]
+  Binomial tree (CRR)  N = 10,000        9.8938   -0.0002       deterministic
+  Crank-Nicolson FD    400 x 400         9.8915   -0.0025       deterministic
+  Bullet: BS lies inside the MC confidence interval.
+  Bullet: tree and grid have the same error for call and put, so they satisfy
+  put-call parity exactly.
+VISUAL   the table; highlight the error column
+PROOF TO SHOW
+  Why tree/grid satisfy parity exactly: both are LINEAR in the payoff.
+  The scheme applied to (call - put) = applied to the forward payoff (S-K),
+  and the tree/grid price the forward exactly (risk-neutral p gives
+  E[S_{t+dt}] = S_t e^{r dt}). So the call and put errors must be equal.
+UNDERLYING  linearity of expectation / linear difference schemes
+SAY      "Every method lands within a quarter of a cent of Black-Scholes."
+
+---------------------------------------------------------------------
+SLIDE 6 - Monte Carlo: method and convergence
+---------------------------------------------------------------------
+ON THE SLIDE
+  Algorithm: draw Z_i, compute S_T^i, average the discounted payoffs.
+  C_hat = e^{-rT} (1/M) sum_i (S_T^i - K)^+
+  SE = std(X)/sqrt(M):  M = 100 -> 1.0;  M = 10^6 -> 0.014;  M = 10^8 -> 0.0014
+  "4x more paths = 2x smaller error"
+VISUAL   notebook: "Simulated GBM paths" + "Distribution of S_T (lognormal)"
+         and "Standard error (log-log)" with slope -1/2
+PROOF TO SHOW (1/sqrt(M) rate)
+  X_i i.i.d., E[X] = C, Var(X) = s^2
+  Var(C_hat) = Var( (1/M) sum X_i ) = (1/M^2) * M * s^2 = s^2/M
+  => SE = s/sqrt(M)
+  CLT: C_hat ~ N(C, s^2/M) approx. => 95% CI = C_hat +/- 1.96 SE
+UNDERLYING
+  - Strong law of large numbers: C_hat -> C almost surely (consistency).
+  - Unbiasedness: E[C_hat] = C exactly, because S_T is sampled from its exact
+    distribution (no Euler discretisation).
+  - Our s is about 14 (from SE = 0.014 at M = 10^6).
+  - The rate does not depend on the dimension of the problem. That is why MC
+    wins for multi-asset and path-dependent options.
+SAY      "MC is unbiased but noisy, and the noise only falls with the square
+          root of the effort."
+
+---------------------------------------------------------------------
+SLIDE 7 - Binomial tree (CRR): method and convergence
+---------------------------------------------------------------------
+ON THE SLIDE
+  dt = T/N,  u = e^{sigma sqrt(dt)},  d = 1/u,  p = (e^{r dt} - d)/(u - d)
+  Backward induction: C(i,j) = e^{-r dt} [ p C(i+1,j+1) + (1-p) C(i+1,j) ]
+  Error: N = 1 -> 1.8;  100 -> 0.02;  1,000 -> 0.002;  10,000 -> 0.0002
+  Error ~ 1/N, oscillating (odd/even N)
+VISUAL   notebook: small CRR tree picture + "Convergence of the tree price"
+         (zig-zag) + "Error (log-log)" with slope -1
+PROOF TO SHOW
+  (a) One-period replication (Replication_One_Period lecture):
+      hold Delta = (C_u - C_d)/(S u - S d) shares + bond, so the portfolio
+      matches the option in both states
+      => C = e^{-r dt}[p C_u + (1-p) C_d] with p as above. p is a
+      risk-neutral probability; it does not depend on mu.
+  (b) Moment matching: E[S_{t+dt}] = S_t e^{r dt} (exact by choice of p),
+      Var[ln S_{t+dt}/S_t] = sigma^2 dt + O(dt^2) (from u = e^{sigma sqrt dt}).
+UNDERLYING
+  - ln S_T is a sum of N i.i.d. +/- sigma sqrt(dt) steps. By the CLT
+    (de Moivre-Laplace) it converges to the normal distribution, so the tree
+    converges to BS.
+  - Error O(1/N). The oscillation comes from the kink of the payoff at K:
+    K = 100 = S0 falls exactly on a node for even N and between two nodes for
+    odd N.
+  - Fixes if asked: average of N and N+1, or Leisen-Reimer tree.
+SAY      "The tree enumerates the risk-neutral expectation. Error falls like
+          1/N but zig-zags because of the payoff kink."
+
+---------------------------------------------------------------------
+SLIDE 8 - Finite differences (Crank-Nicolson): method and convergence
+---------------------------------------------------------------------
+ON THE SLIDE
+  Grid in (S, t), S in [0, Smax = 4K]. Start from the payoff at T and step
+  backwards.
+  Boundaries: V(0,t) = 0,  V(Smax,t) = Smax - K e^{-r(T-t)}
+  Derivatives replaced by central differences, CN = average of explicit and
+  implicit schemes.
+  Doubling the grid divides the error by 4:
+  1.22 -> 0.26 -> 0.062 -> 0.015 -> 0.0038 -> 0.00096 -> 0.00024
+VISUAL   notebook: 3D "Call value on the grid V(S,t)" + "Error (log-log)"
+         with slope -2
+PROOF TO SHOW (truncation error by Taylor expansion)
+  V(S+h) = V + h V' + h^2/2 V'' + h^3/6 V''' + h^4/24 V'''' + ...
+  V(S-h) = V - h V' + h^2/2 V'' - h^3/6 V''' + h^4/24 V'''' - ...
+  Subtract: [V(S+h) - V(S-h)]/(2h) = V' + O(h^2)   (even terms cancel)
+  Add:      [V(S+h) - 2V + V(S-h)]/h^2 = V'' + O(h^2)  (odd terms cancel)
+  Crank-Nicolson is centred at t + dt/2, so the time error is O(dt^2).
+  => total error O(dS^2 + dt^2) ~ 1/N^2 when N_S = N_t = N.
+UNDERLYING
+  - CN is unconditionally stable (von Neumann analysis). The explicit scheme
+    from the lecture is only stable if dt <= dS^2/(sigma^2 S_max^2), see
+    Numerical.pdf: "can be unstable".
+  - Lax equivalence theorem: consistent + stable => convergent.
+  - The payoff kink at K can create small oscillations with CN (fix: a few
+    implicit "Rannacher" steps at the start). Mention only if asked.
+  - Truncating at Smax = 4K: the probability that S_T > 400 is negligible.
+SAY      "The grid solves the PDE directly. Thanks to central differences in
+          both S and t it is the fastest of our three numerical methods."
+
+---------------------------------------------------------------------
+SLIDE 9 - Convergence comparison (the key Part 1 slide)
+---------------------------------------------------------------------
+ON THE SLIDE
+  Three log-log plots side by side, with a reference line in each
+                  error ~       slope   10x effort =>
+  Monte Carlo     1/sqrt(M)     -1/2    3.2x smaller error
+  Binomial tree   1/N           -1      10x smaller error
+  Crank-Nicolson  1/N^2         -2      100x smaller error
+VISUAL   the three log-log error plots from the notebook
+PROOF TO SHOW
+  Why a straight line on log-log: error = c * N^{-k}
+  => log(error) = log c - k log N, a line with slope -k.
+  The three k's come from slides 6, 7 and 8 (CLT, binomial CLT, Taylor).
+SAY      "Same answer, very different speed. The slope of each line is its
+          convergence order."
+
+---------------------------------------------------------------------
+SLIDE 10 - Uncertainty in the numerical results
+---------------------------------------------------------------------
+ON THE SLIDE
+  1. MC: statistical error. Random, unbiased, quantified by a CI.
+     A different seed gives a different price.
+  2. Tree / FD: discretisation error. Deterministic bias, no CI. Size known
+     from the convergence order. FD also has boundary/truncation error (Smax).
+  3. Model uncertainty dominates: vega = 38.2, so a 1 vol point error in sigma
+     moves the price by 0.38, about 200x our MC standard error.
+     The model assumes constant sigma, constant r, no jumps.
+  Which method is best here? BS (exact). Then CN > tree > MC in speed.
+  MC wins for path-dependent and multi-asset options (curse of dimensionality),
+  PDE/tree wins for early exercise (American) - Numerical.pdf.
+VISUAL   a "variance vs. bias" 2x2 picture, or a bar chart comparing the
+         numerical errors (~0.002) with the vega impact of +1 vol pt (0.38)
+PROOF TO SHOW
+  Error decomposition: price_hat - true = (bias) + (noise)
+     MC:      bias = 0,           noise ~ N(0, s^2/M)
+     Tree/FD: bias = c N^{-k},    noise = 0
+  Model error ~ Vega * (sigma_true - sigma_used) (first-order Taylor in sigma)
+SAY      "Our numerical errors are tiny. The real uncertainty is the
+          volatility input."
+
+=====================================================================
+SECTION 2 - REPLICATING PORTFOLIO
+=====================================================================
+
+---------------------------------------------------------------------
+SLIDE 11 - Setup of the replication experiment
+---------------------------------------------------------------------
+ON THE SLIDE
+  t = 0: sell the call for C0 = 9.894, buy Delta0 = N(d1) shares,
+         bank B0 = C0 - Delta0 S0
+  Each rebalancing date: Delta_i = N(d1(S_i, t_i)), self-financing:
+         B_i = B_{i-1} e^{r dt} - (Delta_i - Delta_{i-1}) S_i
+  Paths simulated in the REAL world (drift mu), 10,000 paths, 252 dates
+  Hedging error: eps = Pi_T - (S_T - K)^+
+VISUAL   notebook: "One path ending near the strike" (stock, delta, portfolio
+         vs. payoff over time)
+PROOF TO SHOW
+  Delta = dC/dS = N(d1) (Hedging.pdf: "lots of terms magically cancel").
+  The cancellation identity: S0 phi(d1) = K e^{-rT} phi(d2).
+  Short proof in Appendix A2.
+UNDERLYING
+  Self-financing: dPi = Delta dS + r (Pi - Delta S) dt. No money is added or
+  taken out after t = 0.
+SAY      "We take the theory literally: sell the option, hedge it, and see
+          what is left at expiry."
+
+---------------------------------------------------------------------
+SLIDE 12 - Results: the hedging error
+---------------------------------------------------------------------
+ON THE SLIDE
+  Daily (252): mean = 0.002, std = 0.44 (4.4% of the premium)
+  Rebalancing dates   4     12     52     252    1000
+  Std of error        3.22  1.94   0.95   0.44   0.22
+  Mean error          0.06  0.01   0.01   0.01   0.00
+VISUAL   notebook: histogram of the hedging error (daily) + "Hedging error vs.
+         rebalancing frequency (log-log)" with slope -1/2
+PROOF TO SHOW
+  Std ~ 1/sqrt(N): 4x more rebalancing gives 2x lower std
+  (252 -> 1000: 0.44 -> 0.22). Proof on the next slide.
+SAY      "On average the hedge works. Path by path it misses, and the miss
+          shrinks with the square root of the trading frequency."
+
+---------------------------------------------------------------------
+SLIDE 13 - WHY: the gamma-theta P&L of a delta hedge (core proof of Part 2)
+---------------------------------------------------------------------
+ON THE SLIDE
+  P&L of the hedged position over one step dt (long Delta shares + cash,
+  short the call):
+     d eps = 1/2 Gamma S^2 [ sigma^2 dt - (dS/S)^2 ]
+           = 1/2 Gamma S^2 sigma^2 dt (1 - Z^2)   with dS/S ~ sigma sqrt(dt) Z
+  "variance we were paid for" minus "variance that actually happened"
+VISUAL   Hedging.pdf "break-even movements" picture: the option's parabola
+         over the hedge line. Theta is the vertical drop, gamma is the curvature.
+PROOF TO SHOW
+  1. Taylor/Ito for the option over dt:
+     dC = Theta dt + Delta dS + 1/2 Gamma dS^2
+  2. Hedge portfolio: Delta dS + r (C - Delta S) dt
+  3. Difference: d eps = -Theta dt - 1/2 Gamma dS^2 + r (C - Delta S) dt
+  4. BS PDE: Theta + r S Delta + 1/2 sigma^2 S^2 Gamma - r C = 0
+     => -Theta + r(C - Delta S) = 1/2 sigma^2 S^2 Gamma
+  5. => d eps = 1/2 Gamma S^2 [ sigma^2 dt - (dS/S)^2 ]   QED
+  Consequences:
+   - E[Z^2] = 1, so E[d eps] = 0, so the mean error is about 0 (if sigma is right)
+   - Var per step = 1/2 Gamma^2 S^4 sigma^4 dt^2 (since Var(Z^2) = 2).
+     Summing N steps: N * O(dt^2) = O(T^2/N), so std ~ 1/sqrt(N)
+   - mu does not appear anywhere, so the drift does not matter
+UNDERLYING
+  - Continuous limit (dt -> 0): (dS)^2 -> sigma^2 S^2 dt exactly
+    (quadratic variation, Ito isometry in the lecture), so d eps -> 0:
+    perfect replication, which is the BS argument itself.
+  - Our numbers match the known closed-form approximation for discrete hedging
+    (Derman & Kamal 1999, "When you cannot hedge continuously"):
+       std(eps) ~ sqrt(pi/4) * sigma * Vega / sqrt(N)
+       = 0.886 * 0.2 * 38.17 / sqrt(N) = 6.77/sqrt(N)
+       N = 4: 3.38 (sim 3.22) | 12: 1.95 (1.94) | 52: 0.94 (0.95) |
+       252: 0.43 (0.44) | 1000: 0.21 (0.22)
+    Strong optional slide or Q&A backup. It ties Part 2 to Part 3 (vega).
+SAY      "Delta hedging removes the direction of the stock. What is left is a
+          bet on how much the stock moves: gamma times (implied variance minus
+          realised variance)."
+
+---------------------------------------------------------------------
+SLIDE 14 - What do the differences depend on? (evidence)
+---------------------------------------------------------------------
+ON THE SLIDE
+  1. Rebalancing frequency: std ~ 1/sqrt(N)              (slide 12)
+  2. Where the path ends: biggest errors for S_T near K  (Gamma large near K
+     close to expiry)
+  3. Realised vs. hedging volatility: error has the opposite sign of
+     (sigma_realised - sigma)
+  4. NOT the drift mu:
+     mu        0%     5%     10%    20%
+     mean      0.006  0.008  0.009  -0.001
+     std       0.44   0.44   0.43   0.39
+VISUAL   notebook: scatter "error vs S_T" (funnel at K) + scatter "error vs
+         realised volatility" (downward sloping)
+PROOF TO SHOW
+  Read off from the slide 13 formula: weight Gamma S^2 (location), bracket
+  sigma^2 dt - (dS/S)^2 (realised vol), mu does not appear (drift).
+  ATM gamma near expiry: Gamma = phi(d1)/(S sigma sqrt(T-t)) -> infinity as
+  t -> T when S = K.
+UNDERLYING
+  - Summed over the path: eps ~ 1/2 sum Gamma_i S_i^2 (sigma^2 - sigma_real,i^2) dt
+    + noise. Paths with high realised vol lose, paths with low realised vol gain.
+  - Slight std drop at mu = 20%: paths drift away from K, where gamma is
+    smaller. Mention only if asked.
+SAY      "The error depends on how often we trade, how curved the option is
+          where the path goes, and how volatile the path really was. Never on
+          the drift."
+
+---------------------------------------------------------------------
+SLIDE 15 - Wrong volatility: from noise to systematic loss
+---------------------------------------------------------------------
+ON THE SLIDE
+  Hedging with sigma = 20%, true vol different:
+  True vol    10%     15%     20%    25%     30%
+  Mean err    +3.90   +1.97   0.01   -1.98   -3.97
+  Std err     1.05    0.73    0.44   1.00    1.92
+  About +/-2 per 5 vol points, about 20% of the premium.
+VISUAL   notebook: overlaid histograms "Hedging with sigma = 0.20 when the true
+         vol is different"
+PROOF TO SHOW
+  Take the expectation of the slide 13 formula with sigma_real != sigma:
+    E[eps] = 1/2 * integral_0^T E[ Gamma S^2 ] (sigma^2 - sigma_real^2) dt
+  First-order check: E[eps] ~ C(sigma) - C(sigma_real) ~ Vega * (sigma - sigma_real)
+    = 38.17 * 0.05 = 1.91  vs. simulated 1.97 / -1.98. Matches.
+UNDERLYING
+  - "Gamma = -Theta" (Hedging.pdf eq. 9) only holds if the realised variance
+    equals the variance priced in. Otherwise theta (the premium decay we
+    collect) and gamma (what the moves cost us) no longer cancel.
+  - Std also grows because of the mismatch: path-dependent gamma exposure
+    (paths that sit near K for a long time realise the vol mismatch more).
+SAY      "A delta hedger who sold the option is short volatility. If the stock
+          moves more than priced, the hedge loses money every day. This is the
+          biggest risk, as the lecture says: 'the variance delivered is not
+          right - BIG problem'."
+
+---------------------------------------------------------------------
+SLIDE 16 - When does replication work, and when not?
+---------------------------------------------------------------------
+ON THE SLIDE (two columns)
+  WORKS WELL                          DOES NOT WORK WELL
+  - frequent rebalancing              - rare rebalancing (quarterly: std 3.2,
+  - hedge vol = realised vol            about 1/3 of the premium)
+  - paths ending far from K           - wrong vol: systematic P&L
+    (payoff almost linear)            - S near K close to expiry (gamma blows up)
+  - GBM holds: constant sigma, r,     - reality: transaction costs (trade-off
+    no jumps, no costs                  with 1/sqrt(N)), jumps, stochastic vol
+VISUAL   two-column table, maybe a green/red icon per row
+PROOF TO SHOW  none new. Refer back to the formula on slide 13.
+UNDERLYING
+  - Transaction costs: cost ~ sqrt(N) (more trades) vs. error ~ 1/sqrt(N),
+    so there is an optimal frequency (Leland 1985). Mention only.
+  - Jumps: a jump dS is not small, the Taylor expansion fails, and delta alone
+    cannot hedge it (market incompleteness).
+SAY      "Replication is perfect only in the model's world. In practice we
+          trade off hedging error against costs, and we carry volatility risk."
+
+=====================================================================
+SECTION 3 - GREEKS
+=====================================================================
+
+---------------------------------------------------------------------
+SLIDE 17 - Greeks: results
+---------------------------------------------------------------------
+ON THE SLIDE
+               BS         MC (10^6, SE)       Tree (N=1000, error)
+  Delta        0.6168     0.6167 (0.0006)     0.6167 (-0.00003)
+  Gamma        0.01909    0.01903 (0.00011)   0.01910 (+0.00002)
+  Vega         38.17      38.19 (0.08)        38.16 (-0.01)
+  Vega per vol point (20% -> 21%): 0.38
+  All MC estimates within 0.5 SE of BS. Tree accurate to 4-5 digits.
+VISUAL   the table + notebook "Delta / Gamma / Vega vs. stock price" (BS
+         curves, mark S0 = 100)
+PROOF TO SHOW (closed forms)
+  Delta = N(d1)
+  Gamma = phi(d1) / (S0 sigma sqrt T)  = 0.3817/(100 * 0.2 * 1) = 0.01909
+  Vega  = S0 phi(d1) sqrt T            = 100 * 0.3817 * 1 = 38.17
+  (phi = standard normal density, phi(0.297) = 0.3817)
+  Derivation uses the identity S phi(d1) = K e^{-rT} phi(d2)   (Appendix A2)
+UNDERLYING
+  - Consistency check with the PDE: Theta = rC - rS Delta - 1/2 sigma^2 S^2 Gamma
+    = 0.390 - 2.430 - 3.818 = -5.86 per year. The BS PDE must hold for the
+    Greeks. Optional bullet.
+  - Gamma-vega link: Vega = sigma S^2 T Gamma (38.17 = 0.2 * 10,000 * 0.01909).
+    That is why both peak ATM.
+SAY      "All three methods agree. The interesting part is how hard each method
+          had to work to get there."
+
+---------------------------------------------------------------------
+SLIDE 18 - Interpreting the numbers
+---------------------------------------------------------------------
+ON THE SLIDE
+  Delta = 0.62, not 0.5, even though the option is ATM:
+    d1 = (r + sigma^2/2) sqrt(T)/sigma = 0.297 > 0 because
+    (1) forward F = S0 e^{rT} = 104 > K: ITM relative to the forward
+    (2) lognormal skew: the + sigma^2/2 term
+  Delta != probability of exercise: N(d2) = 0.54 < N(d1) = 0.62
+  Gamma = 0.019: delta moves 0.019 per $1. Largest near K, so hardest to hedge
+  there (link to Part 2)
+  Vega = 38.2: +1 vol point = +0.38, which dominates the numerical errors
+VISUAL   delta vs S plot, marking 0.5, N(d1) and N(d2)
+PROOF TO SHOW
+  N(d1) = Q^S(S_T > K)  (exercise probability under the stock measure)
+  N(d2) = Q(S_T > K)    (exercise probability under the risk-neutral measure)
+  d1 - d2 = sigma sqrt T > 0  =>  N(d1) > N(d2)
+UNDERLYING
+  As T -> 0 with S = K: d1 -> 0, Delta -> 0.5.
+SAY      "Delta is a hedge ratio, not a probability."
+
+---------------------------------------------------------------------
+SLIDE 19 - How each method computes Greeks (and why MC gamma is noisy)
+---------------------------------------------------------------------
+ON THE SLIDE
+  Tree: Delta and Gamma come for free from the first nodes
+     Delta = (C_u - C_d)/(S u - S d)
+     Gamma = [ (C_uu - C_ud)/(S u^2 - S) - (C_ud - C_dd)/(S - S d^2) ] / (0.5 (S u^2 - S d^2))
+     Vega needs 2 extra trees (bump sigma). Error ~ 1/N.
+  MC: bump and reprice with COMMON RANDOM NUMBERS, h = 1 (1% of S0)
+     Delta ~ [C(S+h) - C(S-h)]/(2h)
+     Gamma ~ [C(S+h) - 2C(S) + C(S-h)]/h^2
+  Bias-variance trade-off in h. Gamma has about 6x the relative error of delta.
+VISUAL   notebook: "MC gamma vs bump size h" (noisy for small h, biased for
+         large h) + "Tree: relative error of Greeks (log-log)" +
+         "MC: relative SE of Greeks (log-log)"
+PROOF TO SHOW
+  Bias: Taylor (same as slide 8) gives bias = O(h^2)
+  Variance of MC gamma: the payoff is piecewise linear, so its second
+  difference is non-zero only for paths with S_T within about +/- h of K.
+  That fraction of paths is ~ h. Each such path contributes ~ h/h^2 = 1/h.
+  => Var ~ h * (1/h)^2 / M = 1/(h M)
+  => MSE = c1 h^4 + c2/(h M), so there is an optimal h. Neither tiny nor
+     large h works.
+  Common random numbers: Var(X - Y) = Var X + Var Y - 2 Cov(X,Y). Using the same
+  Z makes Cov large, so the noise of the difference nearly cancels.
+UNDERLYING
+  - Tree Greeks are measured at t = dt and 2 dt instead of t = 0. The offset
+    is O(dt) and vanishes as N grows.
+  - Better MC estimators (mention only): pathwise delta = e^{-rT} 1{S_T>K} S_T/S0
+    (no bump, unbiased); likelihood-ratio method for gamma.
+SAY      "The tree gets Greeks almost for free. MC has to difference noisy
+          numbers, and gamma, a second difference, suffers most."
+
+=====================================================================
+SECTION 4 - WRAP-UP
+=====================================================================
+
+---------------------------------------------------------------------
+SLIDE 20 - Conclusions
+---------------------------------------------------------------------
+ON THE SLIDE
+  1. Pricing: all methods converge to BS = 9.894. Orders: MC 1/2, tree 1, CN 2.
+  2. Uncertainty: MC = random (CI), tree/FD = deterministic bias.
+     Both are tiny compared with model (vol) uncertainty.
+  3. Replication: hedging error = Gamma x (implied - realised variance).
+     Mean 0 and std ~ 1/sqrt(N) if sigma is right. Systematic P&L ~ Vega x
+     vol error if wrong. Independent of mu.
+  4. Greeks: tree is best here, MC is flexible but noisy (gamma).
+  5. The common thread: Gamma and Vega peak near the strike. That is where
+     pricing kinks, hedging errors and Greek noise all come from.
+  Choice of method: closed form if available; PDE/tree for low-dimensional and
+  American options; MC for path-dependent and high-dimensional options.
+VISUAL   none / summary icons
+SAY      "The maths of the model is solid. The weak points are the inputs
+          (volatility) and the real-world frictions."
+
+---------------------------------------------------------------------
+SLIDE 21 - Q&A
+---------------------------------------------------------------------
+
+=====================================================================
+APPENDIX (backup slides for questions)
+=====================================================================
+
+A1 - Black-Scholes formula from the risk-neutral expectation
+  C = e^{-rT} E^Q[S_T 1{S_T>K}] - K e^{-rT} Q(S_T > K)
+  Second term: S_T > K  <=>  Z > -d2  =>  Q = N(d2)
+  First term: write S_T = S0 e^{rT} e^{-sigma^2 T/2 + sigma sqrt T Z} and complete
+  the square in the Gaussian integral (equivalently, change to the stock
+  numeraire, Girsanov shift Z -> Z + sigma sqrt T):
+     e^{-rT} E^Q[S_T 1{S_T>K}] = S0 N(d1)
+  => C = S0 N(d1) - K e^{-rT} N(d2)
+
+A2 - Delta = N(d1) (the "magic cancellation" from Hedging.pdf)
+  Identity: S phi(d1) = K e^{-rT} phi(d2)
+  Proof: phi(d2)/phi(d1) = exp((d1^2 - d2^2)/2) = exp((d1 - d2)(d1 + d2)/2)
+         = exp( sigma sqrt T * [ln(S/K) + rT]/(sigma sqrt T) ) = S e^{rT}/K
+  dC/dS = N(d1) + S phi(d1) d'(d1) - K e^{-rT} phi(d2) d'(d2),
+  and d'(d1) = d'(d2) = 1/(S sigma sqrt T), so the last two terms cancel => N(d1).
+  Gamma = phi(d1)/(S sigma sqrt T),  Vega = S phi(d1) sqrt T follow the same way.
+
+A3 - CRR tree converges to BS
+  ln(S_T/S0) = sum of N i.i.d. steps +/- sigma sqrt(dt), with risk-neutral p.
+  Mean per step: (r - sigma^2/2) dt + O(dt^{3/2}); variance: sigma^2 dt + O(dt^2).
+  CLT => ln(S_T/S0) -> N((r - sigma^2/2) T, sigma^2 T), the BS distribution.
+  Payoff is continuous and bounded by S, so the expectations converge.
+
+A4 - Discrete-hedging error variance (detail for slide 13)
+  eps_N = sum_i 1/2 Gamma_i S_i^2 sigma^2 dt (1 - Z_i^2)
+  Var(1 - Z^2) = 2, so Var(eps_N) ~ 1/2 sigma^4 dt * integral_0^T E[Gamma^2 S^4] dt
+  ~ (pi/4) sigma^2 Vega^2 / N   (Derman-Kamal)
+  Table: simulated std vs. 6.77/sqrt(N) for N = 4, 12, 52, 252, 1000
+  (see slide 13 numbers).
+
+=====================================================================
+SPEAKER SPLIT SUGGESTION (8 people)
+=====================================================================
+  Speaker 1: slides 1-3   (intro, theory foundation)
+  Speaker 2: slides 4-5   (BS, results table)
+  Speaker 3: slides 6-7   (MC, tree)
+  Speaker 4: slides 8-10  (FD, convergence, uncertainty)
+  Speaker 5: slides 11-13 (replication setup, results, gamma-theta proof)
+  Speaker 6: slides 14-16 (dependencies, wrong vol, when it works)
+  Speaker 7: slides 17-19 (Greeks)
+  Speaker 8: slide 20 + Q&A (and owns the appendix)
+
+=====================================================================
+CHECKLIST BEFORE BUILDING THE DECK
+=====================================================================
+  - Export the notebook plots as separate PNGs. The midterm folder currently
+    has only output_monte_carlo.png, output_tree.png and output_grid.png.
+    The hedging and Greeks plots still need saving (plt.savefig).
+  - Fix the participant list in the notebook header (8 names).
+  - State r = 3.94% and its source on slide 2. Results depend on it.
+  - Use the same notation everywhere (d1/d2 vs. h1/h2; Delta per share; vega
+    per 1.00 vs. per vol point).
+  - Seeds: write the seed used for the MC numbers in a footnote
+    (reproducibility).
